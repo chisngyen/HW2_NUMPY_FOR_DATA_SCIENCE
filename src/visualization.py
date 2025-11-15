@@ -1,11 +1,8 @@
-# Chứa các loại biểu đồ cần thiết để visualize data
-
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import List, Optional, Tuple, Dict
 
-# Set style
 plt.style.use('seaborn-v0_8-darkgrid')
 sns.set_palette("husl")
 
@@ -18,15 +15,7 @@ class DataVisualizer:
                       feature_names: List[str],
                       bins: int = 30,
                       title: str = "Feature Distributions") -> plt.Figure:
-        """
-        Plot histograms for multiple features
-        
-        Args:
-            data: NumPy array of shape (n_samples, n_features)
-            feature_names: List of feature names
-            bins: Number of bins for histogram
-            title: Plot title
-        """
+        """Plot histograms for multiple features"""
         n_features = data.shape[1]
         n_cols = 3
         n_rows = (n_features + n_cols - 1) // n_cols
@@ -36,22 +25,18 @@ class DataVisualizer:
         
         for idx in range(n_features):
             ax = axes[idx]
-            
-            # Plot histogram
             ax.hist(data[:, idx], bins=bins, alpha=0.7, color='skyblue', edgecolor='black')
             ax.set_xlabel(feature_names[idx], fontsize=10)
             ax.set_ylabel('Frequency', fontsize=10)
             ax.set_title(f'Distribution: {feature_names[idx]}', fontsize=12, fontweight='bold')
             ax.grid(True, alpha=0.3)
             
-            # Add statistics
             mean_val = np.mean(data[:, idx])
             median_val = np.median(data[:, idx])
             ax.axvline(mean_val, color='red', linestyle='--', linewidth=2, label=f'Mean: {mean_val:.2f}')
             ax.axvline(median_val, color='green', linestyle='--', linewidth=2, label=f'Median: {median_val:.2f}')
             ax.legend()
         
-        # Hide extra subplots
         for idx in range(n_features, len(axes)):
             axes[idx].axis('off')
         
@@ -64,16 +49,7 @@ class DataVisualizer:
                                 feature_names: List[str],
                                 title: str = "Correlation Heatmap",
                                 cmap: str = "coolwarm") -> plt.Figure:
-        """
-        Plot correlation heatmap using Seaborn
-        
-        Args:
-            data: NumPy array of features
-            feature_names: List of feature names
-            title: Plot title
-            cmap: Colormap name
-        """
-        # Compute correlation matrix using NumPy
+        """Plot correlation heatmap"""
         mean = np.mean(data, axis=0)
         centered = data - mean
         n = data.shape[0]
@@ -81,7 +57,6 @@ class DataVisualizer:
         std = np.sqrt(np.diag(cov_matrix))
         corr_matrix = cov_matrix / np.outer(std, std)
         
-        # Plot heatmap
         fig, ax = plt.subplots(figsize=(12, 10))
         
         sns.heatmap(corr_matrix,
@@ -106,17 +81,9 @@ class DataVisualizer:
     def plot_pie_chart(self, data: np.ndarray,
                       labels: List[str],
                       title: str = "Pie Chart") -> plt.Figure:
-        """
-        Plot pie chart for categorical distribution
-        
-        Args:
-            data: NumPy array of counts or proportions
-            labels: List of category labels
-            title: Plot title
-        """
+        """Plot pie chart for categorical distribution"""
         fig, ax = plt.subplots(figsize=(10, 8))
         
-        # Create pie chart
         colors = plt.cm.Set3(np.linspace(0, 1, len(data)))
         wedges, texts, autotexts = ax.pie(data,
                                           labels=labels,
@@ -125,7 +92,6 @@ class DataVisualizer:
                                           startangle=90,
                                           explode=[0.05] * len(data))
         
-        # Beautify text
         for text in texts:
             text.set_fontsize(11)
             text.set_fontweight('bold')
@@ -143,26 +109,17 @@ class DataVisualizer:
     def plot_categorical_cancellations(self, categorical_data: np.ndarray,
                                       feature_names: List[str],
                                       figsize: Tuple[int, int] = (18, 12)) -> plt.Figure:
-        """
-        Plot cancellation distribution for categorical variables
-        
-        Args:
-            categorical_data: Categorical data for attrited customers only
-            feature_names: Names of categorical features
-            figsize: Figure size
-        """
+        """Plot cancellation distribution for categorical variables"""
         fig, axes = plt.subplots(2, 3, figsize=figsize)
         axes = axes.flatten()
         
         for idx, feature_name in enumerate(feature_names):
             unique_vals, counts = np.unique(categorical_data[:, idx], return_counts=True)
             
-            # Sort by counts
             sorted_indices = np.argsort(counts)[::-1]
             unique_vals_sorted = unique_vals[sorted_indices]
             counts_sorted = counts[sorted_indices]
             
-            # Calculate percentages
             total = np.sum(counts_sorted)
             percentages = (counts_sorted / total) * 100
             
@@ -171,7 +128,6 @@ class DataVisualizer:
             bars = ax.barh(range(len(unique_vals_sorted)), percentages, color=colors, 
                           edgecolor='white', linewidth=2)
             
-            # Add percentage labels
             for i, (bar, pct) in enumerate(zip(bars, percentages)):
                 ax.text(bar.get_width() + 0.5, bar.get_y() + bar.get_height()/2, 
                        f'{pct:.2f}%', va='center', fontweight='bold')
@@ -182,7 +138,6 @@ class DataVisualizer:
             ax.set_title(f'Cancellations by {feature_name}', fontsize=12, fontweight='bold')
             ax.grid(True, alpha=0.3, axis='x')
         
-        # Remove empty subplot if needed
         if len(feature_names) < 6:
             fig.delaxes(axes[-1])
         
@@ -192,20 +147,12 @@ class DataVisualizer:
     def plot_transaction_comparison(self, existing_data: np.ndarray, 
                                    attrited_data: np.ndarray,
                                    feature_names: List[str]) -> plt.Figure:
-        """
-        Plot boxplots comparing transaction variables between customer groups
-        
-        Args:
-            existing_data: Transaction data for existing customers
-            attrited_data: Transaction data for attrited customers  
-            feature_names: Names of transaction features
-        """
+        """Plot boxplots comparing transaction variables between customer groups"""
         fig, axes = plt.subplots(2, 2, figsize=(15, 10))
         axes = axes.flatten()
         
         for idx, var_name in enumerate(feature_names):
             ax = axes[idx]
-            
             data_to_plot = [existing_data[:, idx], attrited_data[:, idx]]
             
             bp = ax.boxplot(data_to_plot, labels=['Existing Customer', 'Attrited Customer'],
@@ -221,7 +168,6 @@ class DataVisualizer:
                         fontsize=12, fontweight='bold')
             ax.grid(True, alpha=0.3, axis='y')
             
-            # Add mean values
             mean_existing = np.mean(existing_data[:, idx])
             mean_attrited = np.mean(attrited_data[:, idx])
             ax.text(1, mean_existing, f'Mean: {mean_existing:.2f}', 
@@ -236,17 +182,8 @@ class DataVisualizer:
                                           attrited_mask: np.ndarray,
                                           bins: List[int],
                                           bin_labels: List[str]) -> plt.Figure:
-        """
-        Plot transaction count distribution in bins for both customer groups
-        
-        Args:
-            trans_ct_data: Transaction count data
-            attrited_mask: Boolean mask for attrited customers
-            bins: Bin edges
-            bin_labels: Labels for bins
-        """
+        """Plot transaction count distribution in bins for both customer groups"""
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
-        
         trans_ct_binned = np.digitize(trans_ct_data, bins=bins)
         
         for group_idx, (group_name, mask) in enumerate([('Existing Customer', ~attrited_mask), 
@@ -284,25 +221,17 @@ class DataVisualizer:
     def plot_transaction_scatter(self, trans_ct_data: np.ndarray,
                                 trans_amt_data: np.ndarray,
                                 attrited_mask: np.ndarray) -> plt.Figure:
-        """
-        Plot scatter plot of transaction count vs amount
-        
-        Args:
-            trans_ct_data: Transaction count data
-            trans_amt_data: Transaction amount data
-            attrited_mask: Boolean mask for attrited customers
-        """
+        """Plot scatter plot of transaction count vs amount"""
         fig, ax = plt.subplots(figsize=(14, 8))
         
         colors = {'Existing Customer': 'green', 'Attrited Customer': 'red'}
-        markers = {'Existing Customer': 'o', 'Attrited Customer': 'o'}
         
         for group_name, mask in [('Existing Customer', ~attrited_mask), 
                                  ('Attrited Customer', attrited_mask)]:
             x_data = trans_ct_data[mask]
             y_data = trans_amt_data[mask]
             
-            ax.scatter(x_data, y_data, c=colors[group_name], marker=markers[group_name],
+            ax.scatter(x_data, y_data, c=colors[group_name], marker='o',
                       alpha=0.5, s=50, label=group_name, edgecolors='black', linewidth=0.5)
         
         ax.set_xlabel('Total Transaction Count (Last 12 Months)', 
@@ -320,14 +249,7 @@ class DataVisualizer:
     def plot_categorical_comparison(self, categorical_data: np.ndarray,
                                    attrited_mask: np.ndarray,
                                    feature_names: List[str]) -> plt.Figure:
-        """
-        Plot grouped bar charts comparing categorical distributions
-        
-        Args:
-            categorical_data: All categorical data
-            attrited_mask: Boolean mask for attrited customers
-            feature_names: Names of categorical features
-        """
+        """Plot grouped bar charts comparing categorical distributions"""
         fig, axes = plt.subplots(2, 3, figsize=(20, 12))
         axes = axes.flatten()
         
@@ -336,7 +258,6 @@ class DataVisualizer:
             
             existing_data = categorical_data[~attrited_mask, idx]
             attrited_data = categorical_data[attrited_mask, idx]
-            
             unique_cats = np.unique(categorical_data[:, idx])
             
             existing_pcts = []
@@ -345,10 +266,8 @@ class DataVisualizer:
             for cat in unique_cats:
                 existing_count = np.sum(existing_data == cat)
                 attrited_count = np.sum(attrited_data == cat)
-                
                 existing_pct = (existing_count / len(existing_data)) * 100
                 attrited_pct = (attrited_count / len(attrited_data)) * 100
-                
                 existing_pcts.append(existing_pct)
                 attrited_pcts.append(attrited_pct)
             
