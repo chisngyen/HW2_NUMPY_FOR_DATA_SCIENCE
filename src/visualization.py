@@ -294,41 +294,40 @@ class DataVisualizer:
         
         plt.tight_layout()
         return fig
-    
+
     def plot_model_comparison(self, 
                              results_basic: Dict[str, Dict], 
                              results_enhanced: Dict[str, Dict],
-                             figsize: Tuple[int, int] = (14, 5)) -> plt.Figure:
-        fig, axes = plt.subplots(1, 2, figsize=figsize)
+                             figsize: Tuple[int, int] = (15, 12)) -> plt.Figure:
+        fig, axes = plt.subplots(2, 2, figsize=figsize)
         
-        models_list = list(results_basic.keys())
-        test_acc_basic = [results_basic[m]['test_acc'] for m in models_list]
-        test_acc_enhanced = [results_enhanced[m]['test_acc'] for m in models_list]
-        f1_basic = [results_basic[m]['f1'] for m in models_list]
-        f1_enhanced = [results_enhanced[m]['f1'] for m in models_list]
+        models_to_plot = list(results_basic.keys())
+        metrics = ['test_acc', 'precision', 'recall', 'f1']
+        metric_names = ['Accuracy', 'Precision', 'Recall', 'F1-Score']
         
-        x = np.arange(len(models_list))
-        width = 0.35
-        
-        axes[0].bar(x - width/2, test_acc_basic, width, label='Basic', alpha=0.8)
-        axes[0].bar(x + width/2, test_acc_enhanced, width, label='Enhanced', alpha=0.8)
-        axes[0].set_xlabel('Model')
-        axes[0].set_ylabel('Test Accuracy')
-        axes[0].set_title('Test Accuracy: Basic vs Enhanced')
-        axes[0].set_xticks(x)
-        axes[0].set_xticklabels(models_list, rotation=45, ha='right')
-        axes[0].legend()
-        axes[0].grid(axis='y', alpha=0.3)
-        
-        axes[1].bar(x - width/2, f1_basic, width, label='Basic', alpha=0.8)
-        axes[1].bar(x + width/2, f1_enhanced, width, label='Enhanced', alpha=0.8)
-        axes[1].set_xlabel('Model')
-        axes[1].set_ylabel('F1-Score')
-        axes[1].set_title('F1-Score: Basic vs Enhanced')
-        axes[1].set_xticks(x)
-        axes[1].set_xticklabels(models_list, rotation=45, ha='right')
-        axes[1].legend()
-        axes[1].grid(axis='y', alpha=0.3)
+        for idx, (metric, metric_name) in enumerate(zip(metrics, metric_names)):
+            ax = axes[idx // 2, idx % 2]
+            
+            basic_scores = [results_basic[m][metric] for m in models_to_plot]
+            enhanced_scores = [results_enhanced[m][metric] for m in models_to_plot]
+            
+            x = np.arange(len(models_to_plot))
+            width = 0.35
+            
+            ax.bar(x - width/2, basic_scores, width, label='Basic', alpha=0.8, color='lightcoral')
+            ax.bar(x + width/2, enhanced_scores, width, label='Enhanced', alpha=0.8, color='lightgreen')
+            
+            ax.set_ylabel(metric_name, fontweight='bold', fontsize=12)
+            ax.set_title(f'{metric_name} Comparison', fontweight='bold', fontsize=14)
+            ax.set_xticks(x)
+            ax.set_xticklabels(models_to_plot, rotation=45, ha='right')
+            ax.legend()
+            ax.grid(axis='y', alpha=0.3)
+            ax.set_ylim([0, 1.05])
+            
+            for i, (b_score, e_score) in enumerate(zip(basic_scores, enhanced_scores)):
+                ax.text(i - width/2, b_score + 0.02, f'{b_score:.3f}', ha='center', va='bottom', fontsize=9)
+                ax.text(i + width/2, e_score + 0.02, f'{e_score:.3f}', ha='center', va='bottom', fontsize=9)
         
         plt.tight_layout()
         return fig
