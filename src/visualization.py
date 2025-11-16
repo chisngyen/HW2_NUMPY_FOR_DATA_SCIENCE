@@ -15,7 +15,6 @@ class DataVisualizer:
                       feature_names: List[str],
                       bins: int = 30,
                       title: str = "Feature Distributions") -> plt.Figure:
-        """Plot histograms for multiple features"""
         n_features = data.shape[1]
         n_cols = 3
         n_rows = (n_features + n_cols - 1) // n_cols
@@ -49,7 +48,6 @@ class DataVisualizer:
                                 feature_names: List[str],
                                 title: str = "Correlation Heatmap",
                                 cmap: str = "coolwarm") -> plt.Figure:
-        """Plot correlation heatmap"""
         mean = np.mean(data, axis=0)
         centered = data - mean
         n = data.shape[0]
@@ -81,7 +79,6 @@ class DataVisualizer:
     def plot_pie_chart(self, data: np.ndarray,
                       labels: List[str],
                       title: str = "Pie Chart") -> plt.Figure:
-        """Plot pie chart for categorical distribution"""
         fig, ax = plt.subplots(figsize=(10, 8))
         
         colors = plt.cm.Set3(np.linspace(0, 1, len(data)))
@@ -109,7 +106,6 @@ class DataVisualizer:
     def plot_categorical_cancellations(self, categorical_data: np.ndarray,
                                       feature_names: List[str],
                                       figsize: Tuple[int, int] = (18, 12)) -> plt.Figure:
-        """Plot cancellation distribution for categorical variables"""
         fig, axes = plt.subplots(2, 3, figsize=figsize)
         axes = axes.flatten()
         
@@ -147,7 +143,6 @@ class DataVisualizer:
     def plot_transaction_comparison(self, existing_data: np.ndarray, 
                                    attrited_data: np.ndarray,
                                    feature_names: List[str]) -> plt.Figure:
-        """Plot boxplots comparing transaction variables between customer groups"""
         fig, axes = plt.subplots(2, 2, figsize=(15, 10))
         axes = axes.flatten()
         
@@ -182,7 +177,6 @@ class DataVisualizer:
                                           attrited_mask: np.ndarray,
                                           bins: List[int],
                                           bin_labels: List[str]) -> plt.Figure:
-        """Plot transaction count distribution in bins for both customer groups"""
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
         trans_ct_binned = np.digitize(trans_ct_data, bins=bins)
         
@@ -221,7 +215,6 @@ class DataVisualizer:
     def plot_transaction_scatter(self, trans_ct_data: np.ndarray,
                                 trans_amt_data: np.ndarray,
                                 attrited_mask: np.ndarray) -> plt.Figure:
-        """Plot scatter plot of transaction count vs amount"""
         fig, ax = plt.subplots(figsize=(14, 8))
         
         colors = {'Existing Customer': 'green', 'Attrited Customer': 'red'}
@@ -249,7 +242,6 @@ class DataVisualizer:
     def plot_categorical_comparison(self, categorical_data: np.ndarray,
                                    attrited_mask: np.ndarray,
                                    feature_names: List[str]) -> plt.Figure:
-        """Plot grouped bar charts comparing categorical distributions"""
         fig, axes = plt.subplots(2, 3, figsize=(20, 12))
         axes = axes.flatten()
         
@@ -299,6 +291,44 @@ class DataVisualizer:
         
         if len(feature_names) < 6:
             fig.delaxes(axes[-1])
+        
+        plt.tight_layout()
+        return fig
+    
+    def plot_model_comparison(self, 
+                             results_basic: Dict[str, Dict], 
+                             results_enhanced: Dict[str, Dict],
+                             figsize: Tuple[int, int] = (14, 5)) -> plt.Figure:
+        fig, axes = plt.subplots(1, 2, figsize=figsize)
+        
+        models_list = list(results_basic.keys())
+        test_acc_basic = [results_basic[m]['test_acc'] for m in models_list]
+        test_acc_enhanced = [results_enhanced[m]['test_acc'] for m in models_list]
+        f1_basic = [results_basic[m]['f1'] for m in models_list]
+        f1_enhanced = [results_enhanced[m]['f1'] for m in models_list]
+        
+        x = np.arange(len(models_list))
+        width = 0.35
+        
+        axes[0].bar(x - width/2, test_acc_basic, width, label='Basic', alpha=0.8)
+        axes[0].bar(x + width/2, test_acc_enhanced, width, label='Enhanced', alpha=0.8)
+        axes[0].set_xlabel('Model')
+        axes[0].set_ylabel('Test Accuracy')
+        axes[0].set_title('Test Accuracy: Basic vs Enhanced')
+        axes[0].set_xticks(x)
+        axes[0].set_xticklabels(models_list, rotation=45, ha='right')
+        axes[0].legend()
+        axes[0].grid(axis='y', alpha=0.3)
+        
+        axes[1].bar(x - width/2, f1_basic, width, label='Basic', alpha=0.8)
+        axes[1].bar(x + width/2, f1_enhanced, width, label='Enhanced', alpha=0.8)
+        axes[1].set_xlabel('Model')
+        axes[1].set_ylabel('F1-Score')
+        axes[1].set_title('F1-Score: Basic vs Enhanced')
+        axes[1].set_xticks(x)
+        axes[1].set_xticklabels(models_list, rotation=45, ha='right')
+        axes[1].legend()
+        axes[1].grid(axis='y', alpha=0.3)
         
         plt.tight_layout()
         return fig

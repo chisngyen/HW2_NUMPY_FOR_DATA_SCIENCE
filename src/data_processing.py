@@ -4,7 +4,6 @@ from typing import Tuple, Dict, List, Optional
 class StatisticalAnalyzer:    
     @staticmethod
     def compute_statistics(data: np.ndarray) -> Dict:
-        """Compute descriptive statistics for dataset"""
         stats = {
             'mean': np.mean(data, axis=0),
             'median': np.median(data, axis=0),
@@ -28,7 +27,6 @@ class StatisticalAnalyzer:
     
     @staticmethod
     def correlation_matrix(data: np.ndarray) -> np.ndarray:
-        """Compute correlation matrix"""
         mean = np.mean(data, axis=0)
         centered = data - mean
         
@@ -41,7 +39,6 @@ class StatisticalAnalyzer:
     
     @staticmethod
     def covariance_matrix(data: np.ndarray) -> np.ndarray:
-        """Compute covariance matrix"""
         mean = np.mean(data, axis=0)
         centered = data - mean
         n = data.shape[0]
@@ -51,7 +48,6 @@ class StatisticalAnalyzer:
 class MissingValueHandler:    
     @staticmethod
     def detect_missing(data: np.ndarray) -> np.ndarray:
-        """Detect missing values (NaN, None, empty strings)"""
         if data.dtype.kind in ['f', 'c']:
             return np.isnan(data)
         
@@ -63,7 +59,6 @@ class MissingValueHandler:
     
     @staticmethod
     def fill_mean(data: np.ndarray, mask: Optional[np.ndarray] = None) -> np.ndarray:
-        """Fill missing values with column mean"""
         result = data.copy()
         
         if mask is None:
@@ -77,7 +72,6 @@ class MissingValueHandler:
     
     @staticmethod
     def fill_median(data: np.ndarray, mask: Optional[np.ndarray] = None) -> np.ndarray:
-        """Fill missing values with column median"""
         result = data.copy()
         
         if mask is None:
@@ -91,7 +85,6 @@ class MissingValueHandler:
     
     @staticmethod
     def fill_mode(data: np.ndarray) -> np.ndarray:
-        """Fill missing values with mode for categorical data"""
         result = data.copy()
         
         for col_idx in range(data.shape[1]):
@@ -108,7 +101,6 @@ class MissingValueHandler:
 class OutlierDetector:    
     @staticmethod
     def z_score_method(data: np.ndarray, threshold: float = 3.0) -> np.ndarray:
-        """Detect outliers using Z-score method"""
         mean = np.mean(data, axis=0)
         std = np.std(data, axis=0)
         z_scores = np.abs((data - mean) / (std + 1e-10))
@@ -117,7 +109,6 @@ class OutlierDetector:
     
     @staticmethod
     def iqr_method(data: np.ndarray, k: float = 1.5) -> np.ndarray:
-        """Detect outliers using IQR method"""
         q1 = np.percentile(data, 25, axis=0)
         q3 = np.percentile(data, 75, axis=0)
         iqr = q3 - q1
@@ -130,13 +121,11 @@ class OutlierDetector:
     
     @staticmethod
     def remove_outliers(data: np.ndarray, mask: np.ndarray) -> np.ndarray:
-        """Remove rows containing outliers"""
         row_mask = ~np.any(mask, axis=1)
         return data[row_mask]
     
     @staticmethod
     def cap_outliers(data: np.ndarray, mask: np.ndarray) -> np.ndarray:
-        """Cap outliers at percentile bounds"""
         result = data.copy()
         lower = np.percentile(data, 1, axis=0)
         upper = np.percentile(data, 99, axis=0)
@@ -147,7 +136,6 @@ class Normalizer:
     @staticmethod
     def min_max_scaling(data: np.ndarray, 
                        feature_range: Tuple[float, float] = (0, 1)) -> Tuple[np.ndarray, Dict]:
-        """Min-Max normalization to specified range"""
         x_min = np.min(data, axis=0)
         x_max = np.max(data, axis=0)
         
@@ -163,7 +151,6 @@ class Normalizer:
     
     @staticmethod
     def z_score_standardization(data: np.ndarray) -> Tuple[np.ndarray, Dict]:
-        """Z-score standardization (mean=0, std=1)"""
         mean = np.mean(data, axis=0)
         std = np.std(data, axis=0)
         std[std == 0] = 1
@@ -174,12 +161,10 @@ class Normalizer:
     
     @staticmethod
     def log_transform(data: np.ndarray, offset: float = 1.0) -> np.ndarray:
-        """Log transformation for skewed distributions"""
         return np.log(data + offset)
     
     @staticmethod
     def robust_scaling(data: np.ndarray) -> Tuple[np.ndarray, Dict]:
-        """Robust scaling using median and IQR (resistant to outliers)"""
         median = np.median(data, axis=0)
         q1 = np.percentile(data, 25, axis=0)
         q3 = np.percentile(data, 75, axis=0)
@@ -193,7 +178,6 @@ class Normalizer:
 class FeatureEncoder:
     @staticmethod
     def label_encode(data: np.ndarray) -> Tuple[np.ndarray, Dict]:
-        """Label encoding for categorical variables"""
         encoded = np.zeros(data.shape, dtype=np.int32)
         mappings = {}
         
@@ -211,7 +195,6 @@ class FeatureEncoder:
     
     @staticmethod
     def one_hot_encode(data: np.ndarray) -> Tuple[np.ndarray, Dict]:
-        """One-hot encoding for categorical variables"""
         all_encoded = []
         mappings = {}
         
@@ -238,7 +221,6 @@ class SMOTE:
         self.random_state = random_state
         
     def fit_resample(self, X: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """Oversample minority class using SMOTE algorithm"""
         if self.random_state is not None:
             np.random.seed(self.random_state)
         
@@ -267,7 +249,6 @@ class SMOTE:
     
     def _generate_synthetic_samples(self, X_minority: np.ndarray, 
                                    n_synthetic: int) -> np.ndarray:
-        """Generate synthetic samples using k-NN interpolation"""
         n_samples = X_minority.shape[0]
         synthetic_samples = []
         
@@ -297,7 +278,6 @@ class PCA:
         self.explained_variance_ratio_ = None
     
     def fit(self, X: np.ndarray) -> 'PCA':
-        """Fit PCA model using eigendecomposition"""
         self.mean_ = np.mean(X, axis=0)
         X_centered = X - self.mean_
         
@@ -323,17 +303,14 @@ class PCA:
         return self
     
     def transform(self, X: np.ndarray) -> np.ndarray:
-        """Transform data to PCA space"""
         X_centered = X - self.mean_
         return X_centered @ self.components_
     
     def fit_transform(self, X: np.ndarray) -> np.ndarray:
-        """Fit and transform in one step"""
         self.fit(X)
         return self.transform(X)
     
     def inverse_transform(self, X_pca: np.ndarray) -> np.ndarray:
-        """Transform back from PCA space to original space"""
         return (X_pca @ self.components_.T) + self.mean_
 
 class FeatureSelector:
@@ -341,7 +318,6 @@ class FeatureSelector:
     def select_by_correlation(X: np.ndarray, y: np.ndarray,
                              feature_names: List[str],
                              threshold: float = 0.01) -> Tuple[np.ndarray, List[str]]:
-        """Select features based on correlation with target"""
         correlations = []
         
         for i in range(X.shape[1]):
@@ -371,7 +347,6 @@ class FeatureSelector:
     @staticmethod
     def select_by_variance(X: np.ndarray, feature_names: List[str],
                           threshold: float = 0.01) -> Tuple[np.ndarray, List[str]]:
-        """Remove low-variance features"""
         variances = np.var(X, axis=0)
         selected_mask = variances >= threshold
         
@@ -385,7 +360,6 @@ class FeatureSelector:
     
     @staticmethod
     def compute_spearman_correlation(X: np.ndarray) -> np.ndarray:
-        """Compute Spearman rank correlation matrix"""
         n_samples, n_features = X.shape
         X_ranked = np.zeros_like(X)
         
@@ -409,7 +383,6 @@ class DataSplitter:
     def train_test_split(X: np.ndarray, y: np.ndarray, 
                         test_size: float = 0.2, 
                         random_state: Optional[int] = None) -> Tuple:
-        """Split data into training and testing sets"""
         if random_state is not None:
             np.random.seed(random_state)
         
@@ -430,7 +403,6 @@ class DataSplitter:
     @staticmethod
     def k_fold_split(X: np.ndarray, k: int = 5, 
                     random_state: Optional[int] = None) -> List[Tuple]:
-        """K-Fold cross-validation split"""
         if random_state is not None:
             np.random.seed(random_state)
         
