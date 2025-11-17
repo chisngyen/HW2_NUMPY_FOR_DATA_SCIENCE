@@ -51,8 +51,9 @@ class DataVisualizer:
         mean = np.mean(data, axis=0)
         centered = data - mean
         n = data.shape[0]
-        cov_matrix = (centered.T @ centered) / (n - 1)
-        std = np.sqrt(np.diag(cov_matrix))
+        # Use einsum for efficient correlation matrix
+        cov_matrix = np.einsum('ij,ik->jk', centered, centered) / (n - 1)
+        std = np.sqrt(np.diag(cov_matrix) + 1e-10)
         corr_matrix = cov_matrix / np.outer(std, std)
         
         fig, ax = plt.subplots(figsize=(12, 10))

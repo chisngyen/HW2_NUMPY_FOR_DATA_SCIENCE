@@ -31,8 +31,11 @@ class StatisticalAnalyzer:
         centered = data - mean
         
         n = data.shape[0]
-        cov_matrix = (centered.T @ centered) / (n - 1)
-        std = np.sqrt(np.diag(cov_matrix))
+        # Use einsum for efficient matrix multiplication
+        cov_matrix = np.einsum('ij,ik->jk', centered, centered) / (n - 1)
+        
+        # Numerical stability: avoid division by zero
+        std = np.sqrt(np.diag(cov_matrix) + 1e-10)
         corr_matrix = cov_matrix / np.outer(std, std)
         
         return corr_matrix
@@ -42,7 +45,8 @@ class StatisticalAnalyzer:
         mean = np.mean(data, axis=0)
         centered = data - mean
         n = data.shape[0]
-        cov_matrix = (centered.T @ centered) / (n - 1)
+        # Use einsum for memory-efficient covariance calculation
+        cov_matrix = np.einsum('ij,ik->jk', centered, centered) / (n - 1)
         return cov_matrix
 
 class MissingValueHandler:    
@@ -87,14 +91,18 @@ class MissingValueHandler:
     def fill_mode(data: np.ndarray) -> np.ndarray:
         result = data.copy()
         
-        for col_idx in range(data.shape[1]):
+        # Vectorized approach: process all columns at once
+        mask = (data == '') | (data == 'None')
+        
+        # Only process columns with missing values
+        cols_with_missing = np.where(np.any(mask, axis=0))[0]
+        
+        for col_idx in cols_with_missing:
             col_data = data[:, col_idx]
-            mask = (col_data == '') | (col_data == 'None')
-            
-            if np.any(mask):
-                unique_vals, counts = np.unique(col_data[~mask], return_counts=True)
-                mode_val = unique_vals[np.argmax(counts)]
-                result[mask, col_idx] = mode_val
+            col_mask = mask[:, col_idx]
+            unique_vals, counts = np.unique(col_data[~col_mask], return_counts=True)
+            mode_val = unique_vals[np.argmax(counts)]
+            result[col_mask, col_idx] = mode_val
         
         return result
 
@@ -181,15 +189,15 @@ class FeatureEncoder:
         encoded = np.zeros(data.shape, dtype=np.int32)
         mappings = {}
         
+        # Vectorized label encoding per column
         for col_idx in range(data.shape[1]):
             col_data = data[:, col_idx]
-            unique_vals = np.unique(col_data)
+            unique_vals, inverse_indices = np.unique(col_data, return_inverse=True)
             mapping = {val: idx for idx, val in enumerate(unique_vals)}
             mappings[col_idx] = mapping
             
-            for val, idx in mapping.items():
-                mask = col_data == val
-                encoded[mask, col_idx] = idx
+            # Use inverse_indices directly - fully vectorized
+            encoded[:, col_idx] = inverse_indices
         
         return encoded, mappings
     
@@ -198,16 +206,15 @@ class FeatureEncoder:
         all_encoded = []
         mappings = {}
         
+        # Vectorized one-hot encoding
         for col_idx in range(data.shape[1]):
             col_data = data[:, col_idx]
-            unique_vals = np.unique(col_data)
+            unique_vals, inverse_indices = np.unique(col_data, return_inverse=True)
             n_categories = len(unique_vals)
             
+            # Vectorized one-hot: use fancy indexing
             one_hot = np.zeros((len(col_data), n_categories), dtype=np.int32)
-            
-            for idx, val in enumerate(unique_vals):
-                mask = col_data == val
-                one_hot[mask, idx] = 1
+            one_hot[np.arange(len(col_data)), inverse_indices] = 1
             
             all_encoded.append(one_hot)
             mappings[col_idx] = unique_vals
@@ -250,24 +257,29 @@ class SMOTE:
     def _generate_synthetic_samples(self, X_minority: np.ndarray, 
                                    n_synthetic: int) -> np.ndarray:
         n_samples = X_minority.shape[0]
-        synthetic_samples = []
         
+        # Vectorized distance calculation with numerical stability
         X_sq = np.sum(X_minority ** 2, axis=1, keepdims=True)
-        distances = np.sqrt(X_sq + X_sq.T - 2 * np.dot(X_minority, X_minority.T))
+        distances_sq = np.maximum(X_sq + X_sq.T - 2 * np.dot(X_minority, X_minority.T), 0)
+        distances = np.sqrt(distances_sq)
         
-        for _ in range(n_synthetic):
-            idx = np.random.randint(0, n_samples)
-            sample = X_minority[idx]
-            
-            neighbor_indices = np.argsort(distances[idx])[1:self.k_neighbors+1]
-            neighbor_idx = np.random.choice(neighbor_indices)
-            neighbor = X_minority[neighbor_idx]
-            
-            alpha = np.random.random()
-            synthetic = sample + alpha * (neighbor - sample)
-            synthetic_samples.append(synthetic)
+        # Vectorized sample selection
+        sample_indices = np.random.randint(0, n_samples, size=n_synthetic)
         
-        return np.array(synthetic_samples)
+        # Get k-nearest neighbors for all selected samples
+        neighbor_ranks = np.argsort(distances[sample_indices], axis=1)[:, 1:self.k_neighbors+1]
+        
+        # Randomly select one neighbor from k-nearest for each sample
+        neighbor_choices = np.random.randint(0, self.k_neighbors, size=n_synthetic)
+        neighbor_indices = neighbor_ranks[np.arange(n_synthetic), neighbor_choices]
+        
+        # Vectorized synthetic sample generation
+        alphas = np.random.random(size=(n_synthetic, 1))
+        samples = X_minority[sample_indices]
+        neighbors = X_minority[neighbor_indices]
+        synthetic_samples = samples + alphas * (neighbors - samples)
+        
+        return synthetic_samples
 
 class PCA:
     def __init__(self, n_components: int = 2):
@@ -282,10 +294,13 @@ class PCA:
         X_centered = X - self.mean_
         
         n_samples = X.shape[0]
-        cov_matrix = (X_centered.T @ X_centered) / (n_samples - 1)
+        # Use einsum for efficient covariance matrix
+        cov_matrix = np.einsum('ij,ik->jk', X_centered, X_centered) / (n_samples - 1)
         
+        # Use eigh for symmetric matrices (more stable than eig)
         eigenvalues, eigenvectors = np.linalg.eigh(cov_matrix)
         
+        # Sort eigenvalues in descending order
         idx = np.argsort(eigenvalues)[::-1]
         eigenvalues = eigenvalues[idx]
         eigenvectors = eigenvectors[:, idx]
@@ -293,7 +308,8 @@ class PCA:
         self.components_ = eigenvectors[:, :self.n_components]
         self.explained_variance_ = eigenvalues[:self.n_components]
         
-        total_var = np.sum(eigenvalues)
+        # Numerical stability
+        total_var = np.sum(eigenvalues) + 1e-10
         self.explained_variance_ratio_ = self.explained_variance_ / total_var
         
         print(f"PCA fitted with {self.n_components} components")
@@ -318,18 +334,19 @@ class FeatureSelector:
     def select_by_correlation(X: np.ndarray, y: np.ndarray,
                              feature_names: List[str],
                              threshold: float = 0.01) -> Tuple[np.ndarray, List[str]]:
-        correlations = []
+        # Fully vectorized correlation calculation
+        X_centered = X - np.mean(X, axis=0)
+        y_centered = y - np.mean(y)
         
-        for i in range(X.shape[1]):
-            x_centered = X[:, i] - np.mean(X[:, i])
-            y_centered = y - np.mean(y)
-            
-            corr = np.sum(x_centered * y_centered) / (
-                np.sqrt(np.sum(x_centered**2)) * np.sqrt(np.sum(y_centered**2))
-            )
-            correlations.append(abs(corr))
+        # Use einsum for efficient computation: sum over samples dimension
+        numerator = np.einsum('ij,i->j', X_centered, y_centered)
         
-        correlations = np.array(correlations)
+        # Vectorized denominators with numerical stability
+        x_norms = np.sqrt(np.sum(X_centered**2, axis=0) + 1e-10)
+        y_norm = np.sqrt(np.sum(y_centered**2) + 1e-10)
+        
+        correlations = np.abs(numerator / (x_norms * y_norm))
+        
         selected_mask = correlations >= threshold
         X_selected = X[:, selected_mask]
         selected_names = [name for i, name in enumerate(feature_names) if selected_mask[i]]
@@ -361,19 +378,22 @@ class FeatureSelector:
     @staticmethod
     def compute_spearman_correlation(X: np.ndarray) -> np.ndarray:
         n_samples, n_features = X.shape
-        X_ranked = np.zeros_like(X)
         
-        for i in range(n_features):
-            sorted_indices = np.argsort(X[:, i])
-            ranks = np.empty_like(sorted_indices)
-            ranks[sorted_indices] = np.arange(n_samples)
-            X_ranked[:, i] = ranks
+        # Vectorized ranking using argsort twice
+        sorted_indices = np.argsort(X, axis=0)
+        X_ranked = np.empty_like(X)
         
+        # Vectorized: compute ranks for all columns at once
+        X_ranked[sorted_indices, np.arange(n_features)] = np.arange(n_samples)[:, np.newaxis]
+        
+        # Vectorized correlation matrix calculation using einsum
         mean_ranks = np.mean(X_ranked, axis=0)
         centered_ranks = X_ranked - mean_ranks
         
-        cov_matrix = (centered_ranks.T @ centered_ranks) / (n_samples - 1)
-        std = np.sqrt(np.diag(cov_matrix))
+        # Use einsum for efficient covariance matrix
+        cov_matrix = np.einsum('ij,ik->jk', centered_ranks, centered_ranks) / (n_samples - 1)
+        
+        std = np.sqrt(np.diag(cov_matrix) + 1e-10)
         spearman_corr = cov_matrix / np.outer(std, std)
         
         return spearman_corr

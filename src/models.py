@@ -43,7 +43,8 @@ class LogisticRegression:
         self.bias = 0
         
         for iteration in range(self.n_iterations):
-            z = np.dot(X, self.weights) + self.bias
+            # Use einsum for efficient matrix-vector product
+            z = np.einsum('ij,j->i', X, self.weights) + self.bias
             predictions = self.sigmoid(z)
             
             loss = self.compute_loss(y, predictions)
@@ -51,7 +52,8 @@ class LogisticRegression:
             
             error = predictions - y
             
-            dw = (1/m) * np.dot(X.T, error)
+            # Use einsum for gradient computation
+            dw = (1/m) * np.einsum('ij,i->j', X, error)
             db = (1/m) * np.sum(error)
             
             if self.regularization > 0:
@@ -66,7 +68,8 @@ class LogisticRegression:
         return self
     
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
-        z = np.dot(X, self.weights) + self.bias
+        # Use einsum for efficient prediction
+        z = np.einsum('ij,j->i', X, self.weights) + self.bias
         return self.sigmoid(z)
     
     def predict(self, X: np.ndarray, threshold: float = 0.5) -> np.ndarray:
@@ -85,14 +88,15 @@ class KNearestNeighbors:
     
     @staticmethod
     def euclidean_distance(X1: np.ndarray, X2: np.ndarray) -> np.ndarray:
-        X1_squared = np.sum(X1 ** 2, axis=1, keepdims=True)
-        X2_squared = np.sum(X2 ** 2, axis=1, keepdims=True)
+        # Use einsum for memory-efficient computation
+        X1_squared = np.einsum('ij,ij->i', X1, X1)[:, np.newaxis]
+        X2_squared = np.einsum('ij,ij->i', X2, X2)[np.newaxis, :]
         
-        cross_term = np.dot(X1, X2.T)
+        # Cross term using einsum
+        cross_term = np.einsum('ij,kj->ik', X1, X2)
         
-        distances_squared = X1_squared + X2_squared.T - 2 * cross_term
-        
-        distances_squared = np.maximum(distances_squared, 0)
+        # Numerical stability: ensure non-negative before sqrt
+        distances_squared = np.maximum(X1_squared + X2_squared - 2 * cross_term, 0)
         
         return np.sqrt(distances_squared)
     
@@ -122,13 +126,19 @@ class KNearestNeighbors:
         distances = self.compute_distances(X, self.X_train)
         
         k_nearest_indices = np.argsort(distances, axis=1)[:, :self.k]
+        k_nearest_labels = self.y_train[k_nearest_indices].astype(int)
         
-        k_nearest_labels = self.y_train[k_nearest_indices]
+        # Vectorized mode calculation using bincount
+        # For each row, find the most common label
+        n_samples = k_nearest_labels.shape[0]
+        n_classes = int(self.y_train.max()) + 1
         
-        predictions = np.array([
-            np.bincount(labels.astype(int)).argmax() 
-            for labels in k_nearest_labels
-        ])
+        # Create a 2D array to count votes
+        votes = np.zeros((n_samples, n_classes), dtype=int)
+        row_indices = np.arange(n_samples)[:, np.newaxis]
+        np.add.at(votes, (row_indices, k_nearest_labels), 1)
+        
+        predictions = np.argmax(votes, axis=1)
         
         return predictions
     
@@ -241,14 +251,16 @@ class LinearRegression:
         self.bias = 0
         
         for iteration in range(self.n_iterations):
-            predictions = np.dot(X, self.weights) + self.bias
+            # Use einsum for efficient prediction
+            predictions = np.einsum('ij,j->i', X, self.weights) + self.bias
             
             loss = self.compute_loss(y, predictions)
             self.loss_history.append(loss)
             
             error = predictions - y
             
-            dw = (1/m) * np.dot(X.T, error)
+            # Use einsum for gradient computation
+            dw = (1/m) * np.einsum('ij,i->j', X, error)
             db = (1/m) * np.sum(error)
             
             self.weights -= self.learning_rate * dw
@@ -260,7 +272,8 @@ class LinearRegression:
         return self
     
     def predict(self, X: np.ndarray) -> np.ndarray:
-        return np.dot(X, self.weights) + self.bias
+        # Use einsum for efficient prediction
+        return np.einsum('ij,j->i', X, self.weights) + self.bias
 
 
 class ModelEvaluator:
@@ -275,11 +288,15 @@ class ModelEvaluator:
         if n_classes is None:
             n_classes = max(int(y_true.max()), int(y_pred.max())) + 1
         
-        cm = np.zeros((n_classes, n_classes), dtype=int)
+        # Vectorized confusion matrix using bincount
+        # Combine true and pred labels into single index
+        y_true_int = y_true.astype(int)
+        y_pred_int = y_pred.astype(int)
         
-        for i in range(n_classes):
-            for j in range(n_classes):
-                cm[i, j] = np.sum((y_true == i) & (y_pred == j))
+        # Use fancy indexing: create linear indices
+        indices = y_true_int * n_classes + y_pred_int
+        cm_flat = np.bincount(indices, minlength=n_classes * n_classes)
+        cm = cm_flat.reshape(n_classes, n_classes)
         
         return cm
     
@@ -329,18 +346,21 @@ class ModelEvaluator:
     
     @staticmethod
     def roc_auc_score(y_true: np.ndarray, y_scores: np.ndarray) -> float:
+        # Vectorized ROC AUC calculation with numerical stability
         sort_indices = np.argsort(y_scores)[::-1]
         y_true_sorted = y_true[sort_indices]
         
-        n_pos = np.sum(y_true == 1)
-        n_neg = np.sum(y_true == 0)
+        n_pos = np.sum(y_true == 1) + 1e-10
+        n_neg = np.sum(y_true == 0) + 1e-10
         
+        # Vectorized cumulative sum
         tpr = np.cumsum(y_true_sorted) / n_pos
         fpr = np.cumsum(1 - y_true_sorted) / n_neg
         
         tpr = np.concatenate([[0], tpr])
         fpr = np.concatenate([[0], fpr])
         
+        # Trapezoidal integration
         auc = np.trapz(tpr, fpr)
         
         return auc
@@ -448,7 +468,11 @@ class DecisionTree:
             return self._predict_sample(x, node['right'])
     
     def predict(self, X: np.ndarray) -> np.ndarray:
-        return np.array([self._predict_sample(x, self.tree) for x in X])
+        # Vectorized prediction where possible, fallback to iterative for tree traversal
+        predictions = np.empty(X.shape[0], dtype=int)
+        for i, x in enumerate(X):
+            predictions[i] = self._predict_sample(x, self.tree)
+        return predictions
 
 
 class RandomForest:
@@ -490,8 +514,24 @@ class RandomForest:
         return self
     
     def predict(self, X: np.ndarray) -> np.ndarray:
-        predictions = np.array([tree.predict(X) for tree in self.trees])
-        return np.array([np.bincount(pred.astype(int)).argmax() for pred in predictions.T])
+        # Vectorized ensemble prediction
+        predictions = np.array([tree.predict(X) for tree in self.trees]).astype(int)
+        
+        # Transpose to get (n_samples, n_estimators)
+        predictions = predictions.T
+        
+        # Vectorized mode calculation
+        n_samples = predictions.shape[0]
+        n_classes = int(predictions.max()) + 1
+        
+        # Create vote matrix
+        votes = np.zeros((n_samples, n_classes), dtype=int)
+        row_indices = np.arange(n_samples)[:, np.newaxis]
+        np.add.at(votes, (row_indices, predictions), 1)
+        
+        final_predictions = np.argmax(votes, axis=1)
+        
+        return final_predictions
     
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
         predictions = np.array([tree.predict(X) for tree in self.trees])
